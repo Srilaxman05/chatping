@@ -3,207 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChatPing | Global Messenger</title>
+    <title>ChatPing Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        body { background-color: #0f172a; color: white; font-family: sans-serif; }
         .glass { background: #1e293b; border: 1px solid #334155; }
         .hidden { display: none; }
     </style>
 </head>
-<body class="min-h-screen">
+<body class="p-6">
+    <div class="max-w-md mx-auto">
+        <!-- HEADER -->
+        <nav class="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+            <div class="text-sky-400 font-bold flex items-center gap-2">
+                <i data-lucide="zap"></i> ChatPing
+            </div>
+            <div id="statusDot" class="flex items-center gap-2 text-[10px] font-bold uppercase text-slate-500">
+                <span class="w-2 h-2 rounded-full bg-red-500"></span> <span id="statusLabel">Offline</span>
+            </div>
+        </nav>
 
-    <!-- Navigation -->
-    <nav class="max-w-4xl mx-auto p-6 flex justify-between items-center">
-        <div class="font-bold text-xl text-sky-400 flex items-center gap-2">
-            <i data-lucide="zap"></i> ChatPing
-        </div>
-        <div class="flex gap-4 sm:gap-8 text-sm font-medium opacity-80">
-            <button onclick="showView('home')" class="hover:text-sky-400 transition">Home</button>
-            <button onclick="showView('join')" class="hover:text-sky-400 transition">Join</button>
-            <button onclick="showView('chat')" class="hover:text-sky-400 transition">Chat</button>
-        </div>
-    </nav>
-
-    <main class="max-w-xl mx-auto mt-6 px-6 text-center">
-        <!-- Connection Status -->
-        <div id="statusBadge" class="bg-slate-800 text-slate-400 px-4 py-1 rounded-full text-xs font-bold inline-flex items-center gap-2 mb-6">
-            <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
-            <span id="statusText">Generating your ID...</span>
+        <!-- ID GENERATION BOX -->
+        <div id="setup-box" class="glass p-6 rounded-2xl text-center mb-6">
+            <h1 class="text-xl font-bold mb-2">Local Endpoint</h1>
+            <p class="text-slate-400 text-xs mb-4">Your ID for others to connect to you:</p>
+            <div class="bg-slate-950 p-3 rounded-lg flex items-center justify-between gap-2 border border-slate-800">
+                <code id="myId" class="text-sky-400 font-mono text-sm">GENERATING...</code>
+                <button onclick="copyId()" class="text-slate-500 hover:text-white"><i data-lucide="copy" class="w-4 h-4"></i></button>
+            </div>
+            <div id="error-msg" class="text-red-400 text-[10px] mt-2 hidden">Connection blocked by network/firewall.</div>
         </div>
 
-        <!-- PAGE 1: HOME -->
-        <section id="view-home" class="view">
-            <h1 class="text-4xl font-extrabold tracking-tight sm:text-5xl mt-4">LAN-first messenger</h1>
-            <p class="text-slate-400 mt-6 text-lg">Your private control room for coordination. No server, no logs, just direct peer connection.</p>
-            
-            <div class="glass p-8 rounded-3xl mt-10 shadow-xl">
-                <p class="text-[10px] text-sky-400 mb-2 uppercase tracking-[0.2em] font-black">Your Unique Connection ID</p>
-                <div class="flex items-center justify-center gap-3">
-                    <code id="myIdDisplay" class="text-xl font-mono text-white bg-slate-900 px-4 py-2 rounded-lg border border-slate-700">Waiting...</code>
-                    <button onclick="copyId()" class="p-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition">
-                        <i data-lucide="copy" class="w-5 h-5 text-sky-400"></i>
-                    </button>
+        <!-- ACTION TABS -->
+        <div class="flex gap-2 mb-6">
+            <button onclick="switchTab('join')" class="flex-1 bg-slate-800 py-2 rounded-lg text-sm font-bold">Join Peer</button>
+            <button onclick="switchTab('chat')" id="chat-tab-btn" class="flex-1 bg-slate-800 py-2 rounded-lg text-sm font-bold opacity-50 cursor-not-allowed" disabled>Chat Room</button>
+        </div>
+
+        <!-- JOIN PAGE -->
+        <div id="page-join" class="">
+            <div class="glass p-6 rounded-2xl">
+                <h2 class="font-bold mb-4">Connect to Friend</h2>
+                <input id="remoteId" type="text" placeholder="Paste Friend's ID" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm mb-4 outline-none focus:border-sky-500">
+                <button onclick="connectToPeer()" class="w-full bg-sky-500 text-slate-900 font-bold p-3 rounded-lg hover:bg-sky-400 transition">Establish Link</button>
+            </div>
+        </div>
+
+        <!-- CHAT PAGE -->
+        <div id="page-chat" class="hidden">
+            <div class="glass rounded-2xl h-96 flex flex-col overflow-hidden">
+                <div id="messages" class="flex-1 p-4 overflow-y-auto space-y-3 text-sm">
+                    <div class="text-slate-500 text-center italic mt-10">Waiting for first message...</div>
                 </div>
-                <p class="text-xs text-slate-500 mt-4 italic text-center">Give this ID to a friend so they can join your room.</p>
-            </div>
-        </section>
-
-        <!-- PAGE 2: JOIN -->
-        <section id="view-join" class="view hidden">
-            <h2 class="text-3xl font-bold mt-4">Join a Peer</h2>
-            <p class="text-slate-400 mt-2">Enter the ID of the person you want to chat with.</p>
-            <div class="mt-10 space-y-4">
-                <input id="remoteIdInput" type="text" placeholder="Paste ID here (e.g. 8e2a...)" 
-                       class="w-full bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-center text-white outline-none focus:border-sky-500 transition shadow-inner">
-                <button onclick="connectToPeer()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-black py-4 rounded-xl shadow-lg shadow-sky-500/20 transition flex items-center justify-center gap-2">
-                    <i data-lucide="link"></i> ESTABLISH CONNECTION
-                </button>
-            </div>
-        </section>
-
-        <!-- PAGE 3: CHAT -->
-        <section id="view-chat" class="view hidden mt-4 text-left glass rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[500px]">
-            <div class="bg-slate-800/50 p-4 border-b border-slate-700 flex justify-between items-center">
-                <span class="text-xs font-bold text-sky-400 uppercase tracking-widest">Active Session</span>
-                <span id="peerIndicator" class="text-[10px] text-slate-500 italic font-mono">No peer connected</span>
-            </div>
-            
-            <div id="messageBox" class="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-900/30">
-                <div class="text-center text-slate-600 text-sm mt-20">
-                    <i data-lucide="message-square" class="mx-auto w-10 h-10 opacity-20 mb-2"></i>
-                    <p>Connect with someone to start chatting.</p>
+                <div class="p-3 border-t border-slate-800 flex gap-2">
+                    <input id="chatInput" type="text" placeholder="Message..." class="flex-1 bg-transparent outline-none text-sm" onkeypress="if(event.key==='Enter') send()">
+                    <button onclick="send()" class="text-sky-400"><i data-lucide="send"></i></button>
                 </div>
             </div>
-
-            <div class="p-4 bg-slate-800/80 backdrop-blur-md flex gap-2">
-                <input id="chatInput" type="text" placeholder="Send a message..." 
-                       class="flex-1 bg-transparent border-none outline-none text-white px-2 py-2"
-                       onkeypress="if(event.key === 'Enter') sendMessage()">
-                <button onclick="sendMessage()" class="bg-sky-500 p-3 rounded-xl text-slate-900 hover:scale-105 active:scale-95 transition">
-                    <i data-lucide="send" class="w-5 h-5"></i>
-                </button>
-            </div>
-        </section>
-
-        <!-- STATS FOOTER -->
-        <div class="grid grid-cols-3 gap-4 mt-12 mb-10 text-left">
-            <div class="glass p-4 rounded-2xl">
-                <div id="peerCount" class="text-2xl font-black text-white">0</div>
-                <div class="text-[10px] text-slate-500 uppercase font-bold">Peers Live</div>
-            </div>
-            <div class="glass p-4 rounded-2xl">
-                <div id="msgCount" class="text-2xl font-black text-white">0</div>
-                <div class="text-[10px] text-slate-500 uppercase font-bold">Messages</div>
-            </div>
-            <div class="glass p-4 rounded-2xl">
-                <div class="text-2xl font-black text-sky-400">READY</div>
-                <div class="text-[10px] text-slate-500 uppercase font-bold">Encryption</div>
-            </div>
         </div>
-    </main>
+    </div>
 
     <script>
-        // Setup PeerJS with Global Servers
-        const peer = new Peer({
-            config: {'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }]}
+        // Use a random ID to avoid collisions and 0.peerjs.com default
+        const peer = new Peer(Math.random().toString(36).substr(2, 6), {
+            debug: 2,
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
         });
-        
+
         let conn;
-        let msgTotal = 0;
 
-        // 1. When Peer initializes and gets an ID
         peer.on('open', id => {
-            document.getElementById('myIdDisplay').innerText = id;
-            updateStatus('Online', 'bg-sky-500');
+            document.getElementById('myId').innerText = id;
+            document.getElementById('statusLabel').innerText = 'Online';
+            document.getElementById('statusDot').querySelector('span').className = 'w-2 h-2 rounded-full bg-green-500';
+            document.getElementById('error-msg').classList.add('hidden');
         });
 
-        // 2. When someone else connects to YOU
+        peer.on('error', err => {
+            console.error(err);
+            document.getElementById('error-msg').innerText = "ERROR: " + err.type;
+            document.getElementById('error-msg').classList.remove('hidden');
+        });
+
+        // Receiving a connection
         peer.on('connection', c => {
             conn = c;
-            setupChatLogic();
-            showView('chat');
+            initChat();
         });
 
-        // 3. When YOU connect to someone else
         function connectToPeer() {
-            const rId = document.getElementById('remoteIdInput').value;
-            if (!rId) return alert("Please paste an ID first");
-            
-            updateStatus('Connecting...', 'bg-yellow-500');
-            conn = peer.connect(rId);
-            setupChatLogic();
-            showView('chat');
+            const id = document.getElementById('remoteId').value;
+            if(!id) return alert("Enter ID");
+            conn = peer.connect(id);
+            initChat();
         }
 
-        function setupChatLogic() {
+        function initChat() {
             conn.on('open', () => {
-                updateStatus('Connected', 'bg-emerald-500');
-                document.getElementById('peerCount').innerText = '1';
-                document.getElementById('peerIndicator').innerText = "Connected to: " + conn.peer.substring(0,8) + "...";
+                document.getElementById('chat-tab-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+                document.getElementById('chat-tab-btn').disabled = false;
+                switchTab('chat');
+                document.getElementById('statusLabel').innerText = 'Connected';
             });
-
-            conn.on('data', data => addMessage('Remote', data));
-            
-            conn.on('close', () => {
-                updateStatus('Online', 'bg-sky-500');
-                document.getElementById('peerCount').innerText = '0';
-            });
+            conn.on('data', data => addMessage('Peer', data));
         }
 
-        function sendMessage() {
+        function send() {
             const input = document.getElementById('chatInput');
-            if (conn && input.value) {
+            if(conn && input.value) {
                 conn.send(input.value);
                 addMessage('You', input.value);
                 input.value = '';
             }
         }
 
-        function addMessage(sender, text) {
-            msgTotal++;
-            document.getElementById('msgCount').innerText = msgTotal;
-            const box = document.getElementById('messageBox');
-            
-            // Clear placeholder on first message
-            if(msgTotal === 1) box.innerHTML = '';
-
-            const align = (sender === 'You') ? 'text-right' : 'text-left';
-            const bgColor = (sender === 'You') ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-100';
-            const radius = (sender === 'You') ? 'rounded-l-xl rounded-tr-xl' : 'rounded-r-xl rounded-tl-xl';
-
-            const msgHtml = `<div class="${align} animate-in slide-in-from-bottom-2 duration-300">
-                <span class="text-[9px] text-slate-500 uppercase font-black px-1">${sender}</span>
-                <div class="mt-1 inline-block px-4 py-2 shadow-lg ${radius} ${bgColor}">${text}</div>
+        function addMessage(user, text) {
+            const box = document.getElementById('messages');
+            if(box.innerText.includes('Waiting')) box.innerHTML = '';
+            const msg = `<div class="${user === 'You' ? 'text-right' : 'text-left'}">
+                <span class="text-[9px] text-sky-500 uppercase font-bold">${user}</span>
+                <div class="p-2 rounded-lg mt-1 inline-block ${user === 'You' ? 'bg-sky-600' : 'bg-slate-700'}">${text}</div>
             </div>`;
-            
-            box.innerHTML += msgHtml;
+            box.innerHTML += msg;
             box.scrollTop = box.scrollHeight;
         }
 
-        function updateStatus(text, colorClass) {
-            const badge = document.getElementById('statusBadge');
-            const dot = badge.querySelector('span:first-child');
-            document.getElementById('statusText').innerText = text;
-            dot.className = `w-2 h-2 rounded-full ${colorClass}`;
-            if (text === 'Connecting...') dot.classList.add('animate-pulse');
-            else dot.classList.remove('animate-pulse');
-        }
-
-        function showView(viewId) {
-            document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-            document.getElementById('view-' + viewId).classList.remove('hidden');
+        function switchTab(tab) {
+            document.getElementById('page-join').classList.toggle('hidden', tab !== 'join');
+            document.getElementById('page-chat').classList.toggle('hidden', tab !== 'chat');
         }
 
         function copyId() {
-            const id = document.getElementById('myIdDisplay').innerText;
-            navigator.clipboard.writeText(id);
-            alert("Your ID is copied! Send it to your peer.");
+            navigator.clipboard.writeText(document.getElementById('myId').innerText);
+            alert("ID Copied");
         }
 
-        // Initialize Icons
         lucide.createIcons();
     </script>
 </body>
