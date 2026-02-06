@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatPing | Global LAN Messenger</title>
+    <!-- Tailwind for styling, Lucide for icons, PeerJS for connection -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; }
+        .glass { background: #1e293b; border: 1px solid #334155; }
+    </style>
+</head>
+<body class="min-h-screen font-sans">
+
+    <!-- Navigation -->
+    <nav class="max-w-4xl mx-auto p-6 flex justify-between items-center">
+        <div class="font-bold text-xl text-sky-400">ChatPing</div>
+        <div class="flex gap-6 text-sm opacity-70">
+            <button onclick="showView('home')">Home</button>
+            <button onclick="showView('join')">Join</button>
+            <button onclick="showView('chat')">Chat</button>
+        </div>
+    </nav>
+
+    <main class="max-w-xl mx-auto mt-10 px-6 text-center">
+        <!-- Status Badge -->
+        <div id="statusBadge" class="bg-slate-800 text-slate-400 px-3 py-1 rounded-full text-xs font-bold inline-block">
+            Connecting...
+        </div>
+
+        <!-- View: Home -->
+        <div id="view-home">
+            <h1 class="text-4xl font-bold mt-6">LAN-first messenger</h1>
+            <p class="text-slate-400 mt-4 mb-8">Keep your local team in sync. A lightweight control room for quick coordination.</p>
+            
+            <div class="glass p-6 rounded-2xl">
+                <p class="text-xs text-sky-400 mb-2 uppercase tracking-widest font-bold">Your Global ID</p>
+                <code id="myIdDisplay" class="text-xl break-all">Generating ID...</code>
+                <button onclick="copyId()" class="ml-2 text-slate-500 hover:text-white"><i data-lucide="copy" class="w-4 h-4 inline"></i></button>
+            </div>
+        </div>
+
+        <!-- View: Join -->
+        <div id="view-join" class="hidden mt-10">
+            <h2 class="text-2xl font-bold">Join a Room</h2>
+            <div class="flex gap-2 mt-6">
+                <input id="remoteIdInput" type="text" placeholder="Paste Peer ID here..." class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 outline-none focus:border-sky-500">
+                <button onclick="connectToPeer()" class="bg-sky-500 text-slate-900 font-bold px-6 py-3 rounded-lg">Join</button>
+            </div>
+        </div>
+
+        <!-- View: Chat -->
+        <div id="view-chat" class="hidden mt-10 text-left flex flex-col h-[450px] glass rounded-2xl overflow-hidden">
+            <div id="messageBox" class="flex-1 p-6 overflow-y-auto space-y-4">
+                <p class="text-slate-500 text-center">No messages yet.</p>
+            </div>
+            <div class="p-4 border-t border-slate-700 flex gap-2">
+                <input id="chatInput" type="text" placeholder="Type a message..." class="flex-1 bg-transparent outline-none">
+                <button onclick="sendMessage()" class="text-sky-400"><i data-lucide="send"></i></button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-4 mt-12 text-left">
+            <div class="glass p-4 rounded-xl">
+                <i data-lucide="users" class="text-sky-400 w-5 h-5 mb-2"></i>
+                <div id="peerCount" class="text-xl font-bold">0</div>
+                <div class="text-[10px] text-slate-500 uppercase">Peers Live</div>
+            </div>
+            <div class="glass p-4 rounded-xl">
+                <i data-lucide="message-square" class="text-sky-400 w-5 h-5 mb-2"></i>
+                <div id="msgCount" class="text-xl font-bold">0</div>
+                <div class="text-[10px] text-slate-500 uppercase">Messages</div>
+            </div>
+            <div class="glass p-4 rounded-xl">
+                <i data-lucide="zap" class="text-sky-400 w-5 h-5 mb-2"></i>
+                <div class="text-xl font-bold">3+</div>
+                <div class="text-[10px] text-slate-500 uppercase">Channels</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let peer = new Peer({
+            config: {'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }]}
+        });
+        let conn;
+        let msgTotal = 0;
+
+        // Initialize Peer
+        peer.on('open', id => {
+            document.getElementById('myIdDisplay').innerText = id;
+            document.getElementById('statusBadge').innerText = 'Online';
+        });
+
+        peer.on('connection', c => {
+            conn = c;
+            setupChat();
+            showView('chat');
+        });
+
+        function connectToPeer() {
+            const rId = document.getElementById('remoteIdInput').value;
+            conn = peer.connect(rId);
+            setupChat();
+            showView('chat');
+        }
+
+        function setupChat() {
+            conn.on('open', () => {
+                document.getElementById('statusBadge').innerText = 'Connected';
+                document.getElementById('statusBadge').classList.replace('bg-slate-800', 'bg-emerald-900');
+                document.getElementById('peerCount').innerText = '1';
+            });
+            conn.on('data', data => addMessage('Remote', data));
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            if (conn && input.value) {
+                conn.send(input.value);
+                addMessage('You', input.value);
+                input.value = '';
+            }
+        }
+
+        function addMessage(sender, text) {
+            msgTotal++;
+            document.getElementById('msgCount').innerText = msgTotal;
+            const box = document.getElementById('messageBox');
+            if(msgTotal === 1) box.innerHTML = '';
+            const msgHtml = `<div class="${sender === 'You' ? 'text-right' : 'text-left'}">
+                <span class="text-[10px] text-sky-400 block">${sender}</span>
+                <div class="inline-block px-3 py-2 rounded-lg ${sender === 'You' ? 'bg-sky-500 text-slate-900' : 'bg-slate-700'}">${text}</div>
+            </div>`;
+            box.innerHTML += msgHtml;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function showView(view) {
+            ['home', 'join', 'chat'].forEach(v => document.getElementById('view-' + v).classList.add('hidden'));
+            document.getElementById('view-' + view).classList.remove('hidden');
+        }
+
+        function copyId() {
+            navigator.clipboard.writeText(document.getElementById('myIdDisplay').innerText);
+            alert("ID Copied!");
+        }
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>
